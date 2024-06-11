@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Region Growing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Region Growing Algorithm</h1>
+    <div class="controls">
+        <input type="file" id="upload" accept="image/*">
+        <button id="regionGrow">Region Grow</button>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        document.getElementById('upload').addEventListener('change', loadImage);
+        document.getElementById('regionGrow').addEventListener('click', regionGrowing);
+
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let image = new Image();
+        let imageData, data;
+
+        function loadImage(event) {
+            let file = event.target.files[0];
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                image.src = e.target.result;
+                image.onload = function() {
+                    let scale = Math.min(500 / image.width, 500 / image.height);
+                    let width = image.width * scale;
+                    let height = image.height * scale;
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(image, 0, 0, width, height);
+                    imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    data = imageData.data;
+                }
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function regionGrowing() {
+          
+
+            let seedX = Math.floor(canvas.width / 2);
+            let seedY = Math.floor(canvas.height / 2);
+            let threshold = 30;
+
+            let seedIndex = (seedY * canvas.width + seedX) * 4;
+            let seedColor = {
+                r: data[seedIndex],
+                g: data[seedIndex + 1],
+                b: data[seedIndex + 2]
+            };
+
+            let stack = [{ x: seedX, y: seedY }];
+            let visited = new Uint8Array(canvas.width * canvas.height);
+            visited[seedY * canvas.width + seedX] = 1;
+
+            while (stack.length > 0) {
+                let { x, y } = stack.pop();
+                let currentIndex = (y * canvas.width + x) * 4;
+
+                data[currentIndex] = 255;
+                data[currentIndex + 1] = 0;
+                data[currentIndex + 2] = 0;
+
+                let neighbors = [
+                    { x: x - 1, y: y },
+                    { x: x + 1, y: y },
+                    { x: x, y: y - 1 },
+                    { x: x, y: y + 1 }
+                ];
+
+                for (let neighbor of neighbors) {
+                    let nx = neighbor.x;
+                    let ny = neighbor.y;
+
+                    if (nx >= 0 && nx < canvas.width && ny >= 0 && ny < canvas.height) {
+                        let neighborIndex = (ny * canvas.width + nx) * 4;
+                        if (!visited[ny * canvas.width + nx]) {
+                            let colorDiff = Math.abs(seedColor.r - data[neighborIndex]) +
+                                            Math.abs(seedColor.g - data[neighborIndex + 1]) +
+                                            Math.abs(seedColor.b - data[neighborIndex + 2]);
+
+                            if (colorDiff < threshold) {
+                                stack.push({ x: nx, y: ny });
+                                visited[ny * canvas.width + nx] = 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            ctx.putImageData(imageData, 0, 0);
+        }
+    </script>
+</body>
+</html>

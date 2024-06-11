@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resmin Kenar Algılama</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+            display: none;
+        }
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .chart-container canvas {
+            max-width: 400px;
+            max-height: 300px;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Resmin Kenar Algılama</h1>
+    <div class="controls">
+        <input type="file" id="dosyaSec" accept="image/*">
+    </div>
+    <canvas id="canvas"></canvas>
+    
+    <script>
+        document.getElementById('dosyaSec').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.getElementById('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0, img.width, img.height);
+                    canvas.style.display = 'block'; 
+
+                    const imageData = ctx.getImageData(0, 0, img.width, img.height);
+                    const data = imageData.data;
+                    const width = imageData.width;
+                    const height = imageData.height;
+
+                    const threshold = 128;
+                    const binary = [];
+                    for (let i = 0; i < data.length; i += 4) {
+                        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                        const value = avg >= threshold ? 255 : 0;
+                        binary.push(value, value, value, 255);
+                    }
+
+                    const binaryImageData = new ImageData(new Uint8ClampedArray(binary), width, height);
+                    ctx.putImageData(binaryImageData, 0, 0);
+
+                    const edges = cannyEdgeDetection(binaryImageData);
+
+                    const edgeImageData = ctx.createImageData(width, height);
+                    for (let i = 0; i < edges.length; i++) {
+                        edgeImageData.data[i * 4] = edges[i] * 255;
+                        edgeImageData.data[i * 4 + 1] = edges[i] * 255;
+                        edgeImageData.data[i * 4 + 2] = edges[i] * 255;
+                        edgeImageData.data[i * 4 + 3] = 255;
+                    }
+                    ctx.putImageData(edgeImageData, 0, 0);
+                };
+                img.src = URL.createObjectURL(file);
+            }
+        });
+
+        function cannyEdgeDetection(imageData) {
+            const width = imageData.width;
+            const height = imageData.height;
+            const data = imageData.data;
+            const gray = new Array(width * height);
+            for (let i = 0; i < data.length; i += 4) {
+                gray[i / 4] = data[i] / 255;
+            }
+
+            const gx = [-1, 0, 1, -2, 0, 2, -1, 0, 1];
+            const gy = [-1, -2, -1, 0, 0, 0, 1, 2, 1];
+
+            const gradientX = convolve(gray, gx, width, height);
+            const gradientY = convolve(gray, gy, width, height);
+            const gradient = [];
+            for (let i = 0; i < gradientX.length; i++) {
+                gradient.push(Math.sqrt(gradientX[i] ** 2 + gradientY[i] ** 2));
+            }
+
+            const edges = new Array(width * height).fill(0);
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const i = y * width + x;
+                    if (gradient[i] > 0.1) {
+                        edges[i] = 1;
+                    }
+                }
+            }
+
+            return edges;
+        }
+
+        function convolve(data, kernel, width, height) {
+            const half = Math.floor(Math.sqrt(kernel.length) / 2);
+            const output = new Array(data.length).fill(0);
+            for (let y = half; y < height - half; y++) {
+                for (let x = half; x < width - half; x++) {
+                    let sum = 0;
+                    for (let ky = -half; ky <= half; ky++) {
+                        for (let kx = -half; kx <= half; kx++) {
+                            const i = (y + ky) * width + (x + kx);
+                            const ki = (ky + half) * (half * 2 + 1) + (kx + half);
+                            sum += data[i] * kernel[ki];
+                        }
+                    }
+                    output[y * width + x] = sum;
+                }
+            }
+            return output;
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Processing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007BFF;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>Image Processing</h1>
+    <div class="controls">
+        <input type="file" id="upload" accept="image/*">
+        <button id="sharpen">Keskinleştir</button>
+        <button id="blur">Bulanıklaştır</button>
+    </div>
+    <canvas id="canvas"></canvas>
+
+    <script>
+        document.getElementById('upload').addEventListener('change', load);
+        document.getElementById('sharpen').addEventListener('click', sharpenImage);
+        document.getElementById('blur').addEventListener('click', blurImage);
+
+        let canvas = document.getElementById('canvas');
+        let ctx = canvas.getContext('2d');
+        let image = new Image();
+
+        function load(event) {
+            let file = event.target.files[0];
+            let reader = new FileReader();
+            reader.onload = function(e) {
+                image.src = e.target.result;
+                image.onload = function() {
+                    let scale = Math.min(200 / image.width, 200 / image.height);
+                    let width = image.width * scale;
+                    let height = image.height * scale;
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    ctx.drawImage(image, 0, 0, width, height);
+                }
+            }
+            reader.readAsDataURL(file);
+        }
+
+        function filter(matrix) {
+            let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            let data = imageData.data;
+            let tempData = new Uint8ClampedArray(data);
+
+            let width = canvas.width;
+            let height = canvas.height;
+            let side = Math.round(Math.sqrt(matrix.length));
+            let halfSide = Math.floor(side / 2);
+
+            for (let y = 0; y < height; y++) {
+                for (let x = 0; x < width; x++) {
+                    let r = 0, g = 0, b = 0;
+                    for (let cy = 0; cy < side; cy++) {
+                        for (let cx = 0; cx < side; cx++) {
+                            let scy = y + cy - halfSide;
+                            let scx = x + cx - halfSide;
+                            if (scy >= 0 && scy < height && scx >= 0 && scx < width) {
+                                let srcOff = (scy * width + scx) * 4;
+                                let wt = matrix[cy * side + cx];
+                                r += tempData[srcOff] * wt;
+                                g += tempData[srcOff + 1] * wt;
+                                b += tempData[srcOff + 2] * wt;
+                            }
+                        }
+                    }
+                    let dstOff = (y * width + x) * 4;
+                    data[dstOff] = r;
+                    data[dstOff + 1] = g;
+                    data[dstOff + 2] = b;
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+        }
+        function sharpenImage() {
+            let sharpenMatrix = [
+                0, -1,  0,
+                -1,  5, -1,
+                0, -1,  0
+            ];
+            filter(sharpenMatrix);
+        }
+        function blurImage() {
+            let blurMatrix = [
+                1/9, 1/9, 1/9,
+                1/9, 1/9, 1/9,
+                1/9, 1/9, 1/9
+            ];
+            filter(blurMatrix);
+        }
+    </script>
+</body>
+</html>

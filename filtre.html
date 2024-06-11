@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resim İşleme ve Histogram Görselleştirme</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f0f0f0;
+            margin: 0;
+        }
+        h1 {
+            color: #444;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        input[type="file"], input[type="number"], button {
+            margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        input[type="file"] {
+            padding: 5px;
+        }
+        input[type="number"] {
+            width: 200px; /* Genişliği burada artırabilirsiniz */
+        }
+        button {
+            background-color: #007BFF;
+            color: white;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Resim İşleme ve Histogram Görselleştirme</h1>
+    <div class="controls">
+        <input type="file" id="imgInput" accept="image/*">
+        <input type="number" id="blurValue" placeholder="Blurlama Değeri (1-9)" min="1" max="9">
+        <button onclick="applyBlur()">Blurlama</button>
+        <input type="number" id="sharpenValue" placeholder="Keskinleştirme Değeri (1-5)" min="1" max="5">
+        <button onclick="applySharpen()">Keskinleştirme</button>
+        <button onclick="applyEdgeDetection()">Kenar Çıkarma</button>
+        <button onclick="applyBinary()">Binarizasyon</button>
+    </div>
+    <canvas id="imgCanvas" width="100" height="100"></canvas>
+
+    <script>
+        const imgInput = document.getElementById('imgInput');
+        const imgCanvas = document.getElementById('imgCanvas');
+        const ctx = imgCanvas.getContext('2d');
+
+        let imgData = null;
+
+        imgInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function() {
+                const img = new Image();
+                img.onload = function() {
+                    imgCanvas.width = img.width;
+                    imgCanvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    imgData = ctx.getImageData(0, 0, img.width, img.height);
+                };
+                img.src = reader.result;
+            };
+
+            reader.readAsDataURL(file);
+        });
+
+        function applyBlur() {
+            if (!imgData) return;
+
+            const blurValue = parseInt(document.getElementById('blurValue').value);
+            if (isNaN(blurValue) || blurValue < 1 || blurValue > 9) {
+                alert("Lütfen 1 ile 9 arasında bir blurlama değeri giriniz.");
+                return;
+            }
+            const kernelSize = blurValue;
+            const kernelValue = 1 / (kernelSize * kernelSize);
+            const kernel = Array.from({ length: kernelSize }, () => Array(kernelSize).fill(kernelValue));
+
+            applyConvolution(kernel);
+        }
+
+        function applySharpen() {
+            if (!imgData) return;
+
+            const sharpenValue = parseInt(document.getElementById('sharpenValue').value);
+            if (isNaN(sharpenValue) || sharpenValue < 1 || sharpenValue > 5) {
+                alert("Lütfen 1 ile 5 arasında bir keskinleştirme değeri giriniz.");
+                return;
+            }
+            const kernel = [
+                [0, -1, 0],
+                [-1, 4 + sharpenValue, -1],
+                [0, -1, 0]
+            ];
+
+            applyConvolution(kernel);
+        }
+
+        function applyEdgeDetection() {
+            if (!imgData) return;
+
+            const kernel = [
+                [-1, -1, -1],
+                [-1, 8, -1],
+                [-1, -1, -1]
+            ];
+            applyConvolution(kernel);
+        }
+
+        function applyBinary() {
+            if (!imgData) return;
+
+            const threshold = 128;
+            const output = ctx.createImageData(imgData.width, imgData.height);
+
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                const r = imgData.data[i];
+                const g = imgData.data[i + 1];
+                const b = imgData.data[i + 2];
+                const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+
+                const value = gray >= threshold ? 255 : 0;
+
+                output.data[i] = value;
+                output.data[i + 1] = value;
+                output.data[i + 2] = value;
+                output.data[i + 3] = imgData.data[i + 3];  // alpha channel
+            }
+
+            ctx.putImageData(output, 0, 0);
+        }
+
+        function applyConvolution(kernel) {
+            const w = imgData.width;
+            const h = imgData.height;
+            const output = ctx.createImageData(w, h);
+            const data = imgData.data;
+            const outputData = output.data;
+
+            const kRows = kernel.length;
+            const kCols = kernel[0].length;
+            const halfKRows = Math.floor(kRows / 2);
+            const halfKCols = Math.floor(kCols / 2);
+
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let r = 0, g = 0, b = 0;
+
+                    for (let ky = 0; ky < kRows; ky++) {
+                        for (let kx = 0; kx < kCols; kx++) {
+                            const iy = y + ky - halfKRows;
+                            const ix = x + kx - halfKCols;
+
+                            if (iy >= 0 && iy < h && ix >= 0 && ix < w) {
+                                const i = (iy * w + ix) * 4;
+                                r += data[i] * kernel[ky][kx];
+                                g += data[i + 1] * kernel[ky][kx];
+                                b += data[i + 2] * kernel[ky][kx];
+                            }
+                        }
+                    }
+
+                    const index = (y * w + x) * 4;
+                    outputData[index] = Math.min(Math.max(r, 0), 255);
+                    outputData[index + 1] = Math.min(Math.max(g, 0), 255);
+                    outputData[index + 2] = Math.min(Math.max(b, 0), 255);
+                    outputData[index + 3] = data[index + 3];  // alpha channel
+                }
+            }
+
+            ctx.putImageData(output, 0, 0);
+        }
+    </script>
+</body>
+</html>

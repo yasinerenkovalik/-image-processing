@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Processing</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .container {
+            text-align: center;
+            margin-top: 50px;
+        }
+        .image-container {
+            margin: 20px 0;
+        }
+        .menu {
+            margin: 20px 0;
+        }
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image Processing Tool</h1>
+        <input type="file" id="imageUpload" accept="image/*">
+        <div class="image-container">
+            <canvas id="imageCanvas"></canvas>
+        </div>
+        <div class="menu">
+            <button onclick="showHistogram()">Show Histogram</button>
+            <button onclick="showFilters()">Apply Filters</button>
+            <button onclick="showSegmentation()">Segmentation</button>
+        </div>
+        <div id="histogramSection" style="display: none;">
+            <h2>Histogram</h2>
+            <canvas id="histogramCanvas"></canvas>
+            <button onclick="equalizeHistogram()">Equalize Histogram</button>
+        </div>
+        <div id="filtersSection" style="display: none;">
+            <h2>Filters</h2>
+            <button onclick="applyFilter('sharpen')">Sharpen</button>
+            <button onclick="applyFilter('blur')">Blur</button>
+            <button onclick="applyFilter('edge')">Edge Detection</button>
+        </div>
+        <div id="segmentationSection" style="display: none;">
+            <h2>Segmentation</h2>
+            <button onclick="setRegionGrowing()">Region Growing</button>
+            <!-- applyActiveContour() fonksiyonunu burada çağırmamışsınız -->
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>

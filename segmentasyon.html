@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Görüntü İşleme - Morfolojik İşlemler</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>Görüntü İşleme - Morfolojik İşlemler</h1>
+    <div class="controls">
+        <input type="file" id="imgInput" accept="image/*">
+        <button onclick="applyDilation()">Genleşme</button>
+        <button onclick="applyErosion()">Aşındırma</button>
+        <button onclick="applyOpening()">Açma</button>
+        <button onclick="applyClosing()">Kapama</button>
+    </div>
+    <canvas id="imgCanvas" width="100" height="100"></canvas>
+
+    <script>
+        const imgInput = document.getElementById('imgInput');
+        const imgCanvas = document.getElementById('imgCanvas');
+        const ctx = imgCanvas.getContext('2d');
+
+        let imgData = null;
+
+        imgInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function() {
+                const img = new Image();
+                img.onload = function() {
+                    imgCanvas.width = img.width;
+                    imgCanvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    imgData = ctx.getImageData(0, 0, img.width, img.height);
+                };
+                img.src = reader.result;
+            };
+
+            reader.readAsDataURL(file);
+        });
+
+        function applyDilation() {
+            if (!imgData) return;
+            const kernel = [
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1]
+            ];
+            applyMorphologicalOperation(kernel, 'dilation');
+        }
+
+        function applyErosion() {
+            if (!imgData) return;
+            const kernel = [
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1]
+            ];
+            applyMorphologicalOperation(kernel, 'erosion');
+        }
+
+        function applyOpening() {
+            if (!imgData) return;
+            const kernel = [
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1]
+            ];
+            applyMorphologicalOperation(kernel, 'erosion');
+            imgData = ctx.getImageData(0, 0, imgCanvas.width, imgCanvas.height);
+            applyMorphologicalOperation(kernel, 'dilation');
+        }
+
+        function applyClosing() {
+            if (!imgData) return;
+            const kernel = [
+                [1, 1, 1],
+                [1, 1, 1],
+                [1, 1, 1]
+            ];
+            applyMorphologicalOperation(kernel, 'dilation');
+            imgData = ctx.getImageData(0, 0, imgCanvas.width, imgCanvas.height);
+            applyMorphologicalOperation(kernel, 'erosion');
+        }
+
+        function applyMorphologicalOperation(kernel, operation) {
+            const w = imgData.width;
+            const h = imgData.height;
+            const output = ctx.createImageData(w, h);
+            const data = imgData.data;
+            const outputData = output.data;
+
+            const kRows = kernel.length;
+            const kCols = kernel[0].length;
+            const halfKRows = Math.floor(kRows / 2);
+            const halfKCols = Math.floor(kCols / 2);
+
+            for (let y = 0; y < h; y++) {
+                for (let x = 0; x < w; x++) {
+                    let min = 255;
+                    let max = 0;
+                    for (let ky = 0; ky < kRows; ky++) {
+                        for (let kx = 0; kx < kCols; kx++) {
+                            const iy = y + ky - halfKRows;
+                            const ix = x + kx - halfKCols;
+
+                            if (iy >= 0 && iy < h && ix >= 0 && ix < w) {
+                                const i = (iy * w + ix) * 4;
+                                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+
+                                if (operation === 'dilation') {
+                                    max = Math.max(max, gray);
+                                } else if (operation === 'erosion') {
+                                    min = Math.min(min, gray);
+                                }
+                            }
+                        }
+                    }
+
+                    const index = (y * w + x) * 4;
+                    const value = (operation === 'dilation') ? max : min;
+
+                    outputData[index] = outputData[index + 1] = outputData[index + 2] = value;
+                    outputData[index + 3] = data[index + 3];  // alpha channel
+                }
+            }
+
+            ctx.putImageData(output, 0, 0);
+            imgData = output;
+        }
+    </script>
+</body>
+</html>

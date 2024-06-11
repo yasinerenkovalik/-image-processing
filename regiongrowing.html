@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Segmentation</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background-color: #f4f4f4;
+      margin: 0;
+    }
+    #upload_area {
+      border: 2px dashed #ccc;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      width: 80%;
+      max-width: 600px;
+      margin: 20px auto;
+      background-color: #fff;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s, border-color 0.3s;
+    }
+    #upload_area:hover {
+      background-color: #f0f0f0;
+      border-color: #aaa;
+    }
+    #file_input {
+      display: none;
+    }
+    #upload_button {
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+    #upload_button:hover {
+      background-color: #0056b3;
+    }
+    #input_image_preview {
+      display: none;
+      max-width: 100%;
+      margin-top: 20px;
+    }
+    #output_image {
+      max-width: 100%;
+      margin-top: 20px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background-color: #28a745;
+      color: #fff;
+      transition: background-color 0.3s;
+    }
+    button:hover {
+      background-color: #218838;
+    }
+    #clear_button {
+      background-color: #dc3545;
+    }
+    #clear_button:hover {
+      background-color: #c82333;
+    }
+  </style>
+</head>
+<body>
+  <div id="upload_area">
+    <p id="upload_text">Click here to upload an image</p>
+    <input type="file" id="file_input">
+    <button id="upload_button">Select File</button>
+  </div>
+  <img id="input_image_preview" src="" alt="Input Image Preview">
+  <img id="output_image" src="placeholder.png" alt="Output Image">
+  <br>
+  <button id="clear_button">Clear</button>
+  <button id="submit_button">Submit</button>
+  <button id="region_growing_button">Apply Region Growing</button>
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+      const fileInput = document.getElementById("file_input");
+      const uploadArea = document.getElementById("upload_area");
+      const uploadText = document.getElementById("upload_text");
+      const inputImagePreview = document.getElementById("input_image_preview");
+      const outputImage = document.getElementById("output_image");
+      const clearButton = document.getElementById("clear_button");
+      const submitButton = document.getElementById("submit_button");
+      const regionGrowingButton = document.getElementById("region_growing_button");
+      const uploadButton = document.getElementById("upload_button");
+
+      let imgData = null;
+      let seeds = [];
+
+      uploadArea.addEventListener("click", function () {
+        fileInput.click();
+      });
+
+      uploadButton.addEventListener("click", function () {
+        fileInput.click();
+      });
+
+      fileInput.addEventListener("change", function () {
+        const file = fileInput.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            inputImagePreview.src = e.target.result;
+            inputImagePreview.style.display = "block";
+            uploadText.style.display = "none";
+            uploadButton.style.display = "none";
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+
+      clearButton.addEventListener("click", function () {
+        fileInput.value = "";
+        inputImagePreview.src = "";
+        inputImagePreview.style.display = "none";
+        uploadText.style.display = "block";
+        uploadButton.style.display = "inline-block";
+        outputImage.src = "placeholder.png";
+        seeds = [];
+      });
+
+      submitButton.addEventListener("click", function () {
+        if (inputImagePreview.src) {
+          const img = new Image();
+          img.src = inputImagePreview.src;
+
+          img.onload = function () {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            canvas.width = img.width;
+            canvas.height = img.height;
+            ctx.drawImage(img, 0, 0);
+
+            imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            outputImage.src = canvas.toDataURL();
+
+            outputImage.addEventListener("click", function (event) {
+              const rect = outputImage.getBoundingClientRect();
+              const x = event.clientX - rect.left;
+              const y = event.clientY - rect.top;
+              seeds.push({ x: Math.floor(x), y: Math.floor(y) });
+              console.log(`Seed point added: (${x}, ${y})`);
+            });
+          };
+        }
+      });
+
+      regionGrowingButton.addEventListener("click", function () {
+        if (imgData && seeds.length > 0) {
+          seeds.forEach((seed, index) => {
+            const result = applyRegionGrowing(
+              imgData,
+              seed.x,
+              seed.y,
+              getRandomColor(index)
+            );
+            displayResult(result);
+          });
+        } else {
+          alert("Bir piksel seçin.");
+        }
+      });
+
+      function applyRegionGrowing(imgData, startX, startY, color) {
+        const width = imgData.width;
+        const height = imgData.height;
+        const data = imgData.data;
+        const processed = new Uint8Array(width * height);
+        const queue = [];
+        const threshold = 25;
+        const startPos = (startY * width + startX) * 4;
+        const startColor = [data[startPos], data[startPos + 1], data[startPos + 2]];
+
+        queue.push([startX, startY]);
+        processed[startY * width + startX] = 1;
+
+        while (queue.length > 0) {
+          const [x, y] = queue.shift();
+          const pos = (y * width + x) * 4;
+
+          for (let dx = -1; dx <= 1; dx++) {
+            for (let dy = -1; dy <= 1; dy++) {
+              const nx = x + dx;
+              const ny = y + dy;
+              if (
+                nx >= 0 &&
+                nx < width &&
+                ny >= 0 &&
+                ny < height &&
+                !processed[ny * width + nx]
+              ) {
+                const nPos = (ny * width + nx) * 4;
+                const colorDiff =
+                  Math.abs(data[nPos] - startColor[0]) +
+                  Math.abs(data[nPos + 1] - startColor[1]) +
+                  Math.abs(data[nPos + 2] - startColor[2]);
+                if (colorDiff < threshold) {
+                  queue.push([nx, ny]);
+                  processed[ny * width + nx] = 1;
+                  data[nPos] = color[0];
+                  data[nPos + 1] = color[1];
+                  data[nPos + 2] = color[2];
+                }
+              }
+            }
+          }
+        }
+        return imgData;
+      }
+
+      function getRandomColor(index) {
+        const colors = [
+          [255, 0, 0],
+          [0, 255, 0],
+          [0, 0, 255],
+          [255, 255, 0],
+          [0, 255, 255],
+          [255, 0, 255],
+          [128, 0, 128],
+          [255, 165, 0],
+        ];
+        return colors[index % colors.length];
+      }
+
+      function displayResult(imgData) {
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = imgData.width;
+        canvas.height = imgData.height;
+        ctx.putImageData(imgData, 0, 0);
+        outputImage.src = canvas.toDataURL();
+      }
+    });
+  </script>
+</body>
+</html>

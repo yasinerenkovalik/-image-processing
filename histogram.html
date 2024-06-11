@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Histogram Görselleştirme</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+        }
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .chart-container canvas {
+            max-width: 400px;
+            max-height: 300px;
+            margin: 10px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Histogram Görselleştirme</h1>
+    <div class="controls">
+        <input type="file" id="imgInput" accept="image/*">
+        <button onclick="showHistogram()">Histogramı Göster</button>
+        <button onclick="equalizeHistogram()">Histogram Eşitle</button>
+        <button onclick="applyGrayFilter()">Gri Filtre Uygula</button>
+    </div>
+    <canvas id="imgCanvas" width="100" height="100"></canvas>
+    <div class="chart-container">
+        <canvas id="redChart"></canvas>
+        <canvas id="greenChart"></canvas>
+        <canvas id="blueChart"></canvas>
+        <canvas id="grayChart"></canvas>
+    </div>
+
+    <script>
+        const imgInput = document.getElementById('imgInput');
+        const imgCanvas = document.getElementById('imgCanvas');
+        const ctx = imgCanvas.getContext('2d');
+        const redChartCtx = document.getElementById('redChart').getContext('2d');
+        const greenChartCtx = document.getElementById('greenChart').getContext('2d');
+        const blueChartCtx = document.getElementById('blueChart').getContext('2d');
+        const grayChartCtx = document.getElementById('grayChart').getContext('2d');
+
+        let imgData = null;
+
+        imgInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function() {
+                const img = new Image();
+                img.onload = function() {
+                    imgCanvas.width = img.width;
+                    imgCanvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    imgData = ctx.getImageData(0, 0, img.width, img.height);
+                };
+                img.src = reader.result;
+            };
+
+            reader.readAsDataURL(file);
+        });
+
+        function showHistogram() {
+            if (!imgData) return;
+
+            const histograms = getHistograms(imgData);
+            drawHistograms(histograms);
+        }
+
+        function equalizeHistogram() {
+            if (!imgData) return;
+
+            const histograms = getHistograms(imgData);
+            const equalizedData = equalize(imgData, histograms);
+
+            ctx.putImageData(equalizedData, 0, 0);
+        }
+
+        function applyGrayFilter() {
+            if (!imgData) return;
+
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                const r = imgData.data[i];
+                const g = imgData.data[i + 1];
+                const b = imgData.data[i + 2];
+                const gray = 0.3 * r + 0.59 * g + 0.11 * b;
+
+                imgData.data[i] = gray;
+                imgData.data[i + 1] = gray;
+                imgData.data[i + 2] = gray;
+            }
+
+            ctx.putImageData(imgData, 0, 0);
+
+            const grayHist = getGrayHistogram(imgData);
+            drawGrayHistogram(grayHist);
+        }
+
+        function getHistograms(imgData) {
+            const histograms = [new Array(256).fill(0), new Array(256).fill(0), new Array(256).fill(0)];
+
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                const r = imgData.data[i];
+                const g = imgData.data[i + 1];
+                const b = imgData.data[i + 2];
+
+                histograms[0][r]++;
+                histograms[1][g]++;
+                histograms[2][b]++;
+            }
+            return histograms;
+        }
+
+        function getGrayHistogram(imgData) {
+            const histogram = new Array(256).fill(0);
+
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                const gray = imgData.data[i];
+                histogram[gray]++;
+            }
+
+            return histogram;
+        }
+
+        function equalize(imgData, histograms) {
+            const cdf = [new Array(256).fill(0), new Array(256).fill(0), new Array(256).fill(0)];
+            const totalPixels = imgData.width * imgData.height;
+
+            for (let i = 0; i < 256; i++) {
+                if (i === 0) {
+                    cdf[0][i] = histograms[0][i];
+                    cdf[1][i] = histograms[1][i];
+                    cdf[2][i] = histograms[2][i];
+                } else {
+                    cdf[0][i] = cdf[0][i - 1] + histograms[0][i];
+                    cdf[1][i] = cdf[1][i - 1] + histograms[1][i];
+                    cdf[2][i] = cdf[2][i - 1] + histograms[2][i];
+                }
+            }
+
+            const cdfMin = [
+                cdf[0].find(value => value > 0),
+                cdf[1].find(value => value > 0),
+                cdf[2].find(value => value > 0)
+            ];
+
+            for (let i = 0; i < imgData.data.length; i += 4) {
+                const r = imgData.data[i];
+                const g = imgData.data[i + 1];
+                const b = imgData.data[i + 2];
+
+                imgData.data[i] = Math.round((cdf[0][r] - cdfMin[0]) / (totalPixels - cdfMin[0]) * 255);
+                imgData.data[i + 1] = Math.round((cdf[1][g] - cdfMin[1]) / (totalPixels - cdfMin[1]) * 255);
+                imgData.data[i + 2] = Math.round((cdf[2][b] - cdfMin[2]) / (totalPixels - cdfMin[2]) * 255);
+            }
+
+            return imgData;
+        }
+
+        function drawHistograms(histograms) {
+            const labels = Array.from({ length: 256 }, (_, i) => i);
+
+            new Chart(redChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Kırmızı Histogram',
+                        data: histograms[0],
+                        backgroundColor: 'rgba(255, 99, 132, 0.5)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Yoğunluk'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Piksel Sayısı'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            new Chart(greenChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Yeşil Histogram',
+                        data: histograms[1],
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Yoğunluk'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Piksel Sayısı'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            new Chart(blueChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Mavi Histogram',
+                        data: histograms[2],
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Yoğunluk'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Piksel Sayısı'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function drawGrayHistogram(histogram) {
+            const labels = Array.from({ length: 256 }, (_, i) => i);
+
+            new Chart(grayChartCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Gri Histogram',
+                        data: histogram,
+                        backgroundColor: 'rgba(128, 128, 128, 0.5)',
+                        borderColor: 'rgba(128, 128, 128, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Yoğunluk'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: 'Piksel Sayısı'
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>

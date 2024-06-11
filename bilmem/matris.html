@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resim Matrisi</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            background-color: #f4f4f4;
+            margin: 0;
+        }
+        h1 {
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        input[type="file"] {
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px 0;
+            display: none;
+        }
+        .chart-container {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .chart-container canvas {
+            max-width: 400px;
+            max-height: 300px;
+            margin: 10px;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <h1>Resim Matrisi</h1>
+    <div class="controls">
+        <input type="file" id="dosyaInput">
+    </div>
+    <canvas id="resimCanvas" width="100" height="100"></canvas>
+    <div class="chart-container">
+        <canvas id="redChart"></canvas>
+        <canvas id="greenChart"></canvas>
+        <canvas id="blueChart"></canvas>
+    </div>
+
+    <script>
+        var dosyaInput = document.getElementById('dosyaInput');
+        var resimCanvas = document.getElementById('resimCanvas');
+        var ctx = resimCanvas.getContext('2d');
+        var redChartCtx = document.getElementById('redChart').getContext('2d');
+        var greenChartCtx = document.getElementById('greenChart').getContext('2d');
+        var blueChartCtx = document.getElementById('blueChart').getContext('2d');
+
+        dosyaInput.addEventListener('change', function(e) {
+            var dosya = e.target.files[0];
+            var resim = new Image();
+
+            resim.onload = function() {
+         
+                let scale = Math.min(200 / resim.width, 200 / resim.height);
+                let width = resim.width * scale;
+                let height = resim.height * scale;
+
+                resimCanvas.width = width;
+                resimCanvas.height = height;
+                ctx.drawImage(resim, 0, 0, resimCanvas.width, resimCanvas.height);
+                var imageData = ctx.getImageData(0, 0, resimCanvas.width, resimCanvas.height);
+                var pikseller = imageData.data;
+                var genislik = resimCanvas.width;
+                var yukseklik = resimCanvas.height;
+                var matris = [];
+
+                for (var y = 0; y < yukseklik; y++) {
+                    var satir = [];
+                    for (var x = 0; x < genislik; x++) {
+                        var indeks = (y * genislik + x) * 4; 
+                        var r = pikseller[indeks];
+                        var g = pikseller[indeks + 1];
+                        var b = pikseller[indeks + 2];
+                        var a = pikseller[indeks + 3];
+                        satir.push([r, g, b, a]); 
+                    }
+                    matris.push(satir); 
+                }
+                var redValues = [];
+                var greenValues = [];
+                var blueValues = [];
+                var labels = [];
+
+                for (var i = 0; i < pikseller.length; i += 4) {
+                    var pikselIndeksi = Math.floor(i / 4) + 1;
+                    labels.push(pikselIndeksi);
+                    redValues.push(pikseller[i]);
+                    greenValues.push(pikseller[i + 1]);
+                    blueValues.push(pikseller[i + 2]);
+                }
+
+                // Kırmızı değerler grafiği
+                var redChart = new Chart(redChartCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Kırmızı',
+                                data: redValues,
+                                borderColor: 'rgba(255, 99, 132, 1)',
+                                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                                fill: false,
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'Piksel İndeksi'
+                                }
+                            },
+                            y: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'RGB Değeri'
+                                },
+                                beginAtZero: true,
+                                max: 255
+                            }
+                        }
+                    }
+                });
+
+                var greenChart = new Chart(greenChartCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Yeşil',
+                                data: greenValues,
+                                borderColor: 'rgba(75, 192, 192, 1)',
+                                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                                fill: false,
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'Piksel İndeksi'
+                                }
+                            },
+                            y: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'RGB Değeri'
+                                },
+                                beginAtZero: true,
+                                max: 255
+                            }
+                        }
+                    }
+                });
+
+          
+                var blueChart = new Chart(blueChartCtx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Mavi',
+                                data: blueValues,
+                                borderColor: 'rgba(54, 162, 235, 1)',
+                                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                                fill: false,
+                                borderWidth: 1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'Piksel İndeksi'
+                                }
+                            },
+                            y: {
+                                display: true,
+                                title: {
+                                    display: true,
+                                    text: 'RGB Değeri'
+                                },
+                                beginAtZero: true,
+                                max: 255
+                            }
+                        }
+                    }
+                });
+            };
+
+       
+            var dosyaOkuyucu = new FileReader();
+            dosyaOkuyucu.readAsDataURL(dosya);
+            dosyaOkuyucu.onload = function(ev) {
+                resim.src = ev.target.result;
+            };
+        });
+    </script>
+</body>
+</html>
+
+                                   
