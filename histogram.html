@@ -12,29 +12,57 @@
             align-items: center;
             justify-content: center;
             min-height: 100vh;
-            background-color: #f4f4f4;
+            background-color: #f0f4f8;
             margin: 0;
+            padding: 20px;
         }
         h1 {
             color: #333;
+            margin-bottom: 20px;
+            text-align: center;
         }
         .controls {
             display: flex;
             flex-direction: column;
             align-items: center;
             margin-bottom: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        input[type="file"], button {
+            margin: 10px 0;
+            padding: 10px 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 16px;
+            width: 220px;
+            transition: all 0.3s ease;
         }
         input[type="file"] {
-            margin-bottom: 10px;
+            padding: 5px;
+            width: auto;
+        }
+        button {
+            background-color: #00897b;
+            color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #00695c;
         }
         canvas {
             border: 1px solid #ccc;
             margin: 10px 0;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
         }
         .chart-container {
             display: flex;
             justify-content: center;
             flex-wrap: wrap;
+            gap: 20px;
         }
         .chart-container canvas {
             max-width: 400px;
@@ -332,3 +360,4 @@
     </script>
 </body>
 </html>
+
